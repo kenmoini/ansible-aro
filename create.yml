@@ -1,0 +1,28 @@
+---
+- name: Create Azure Red Hat OpenShift Cluster
+  hosts: all
+  gather_facts: false
+
+
+  tasks:
+
+    - name: SITECONFIG - Read in site configs
+      when:
+        - use_site_configs | bool
+        - site_config_name is defined
+      ansible.builtin.include_vars:
+        dir: "site-configs/{{ site_config_name }}"
+        extensions:
+          - 'yaml'
+          - 'yml'
+      tags:
+        - always
+
+    - name: Get the account details to perform a connectivity and authentication test
+      azure.azcollection.azure_rm_account_info:
+      register: r_account_info
+
+    - name: Run the terraform bootstrapper to enable Resource Providers
+      community.general.terraform:
+        project_path: files/terraform/enable-resource-providers
+        state: present
