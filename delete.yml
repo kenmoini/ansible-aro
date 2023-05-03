@@ -55,7 +55,6 @@
         resource_group: "{{ cluster_vnet_resource_group }}"
         state: absent
       register: r_vnet_delete
-      failed_when: "'could not be found' not in r_vnet_delete.msg"
 
     - name: Delete the ARO VNet ResourceGroup
       when: create_vnet_resource_group | bool

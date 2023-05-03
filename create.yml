@@ -4,6 +4,7 @@
   gather_facts: false
   vars:
     use_site_configs: true
+    site_config_name: "my-pretty-cluster"
 
   tasks:
 
@@ -19,12 +20,90 @@
       tags:
         - always
 
-    - name: Get the account details to perform a connectivity and authentication test
+    - name: Preflight - Get the account details to perform a connectivity and authentication test
       azure.azcollection.azure_rm_subscription_info:
-        all: True
+        all: true
       register: r_account_info
 
-    - name: Run the terraform bootstrapper to enable Resource Providers
-      community.general.terraform:
-        project_path: files/terraform/enable-resource-providers
+    - name: Create the ARO ResourceGroup
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ cluster_resource_group }}"
+        location: "{{ azure_location }}"
+        tags: "{{ resource_tags | default(omit) }}"
         state: present
+      register: r_resource_group
+
+    - name: Create the ARO VNet ResourceGroup
+      when: create_vnet_resource_group | bool
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ cluster_vnet_resource_group }}"
+        location: "{{ azure_location }}"
+        tags: "{{ resource_tags | default(omit) }}"
+        state: present
+      register: r_vnet_resource_group
+
+    - name: Set the ARO VNet ResourceGroup fact if not a separate RG
+      when: not create_vnet_resource_group | bool
+      ansible.builtin.set_fact:
+        cluster_vnet_resource_group: "{{ cluster_resource_group }}"
+
+    - name: Create the ARO VNet
+      azure.azcollection.azure_rm_virtualnetwork:
+        name: "{{ cluster_vnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        location: "{{ azure_location }}"
+        address_prefixes: "{{ cluster_vnet_cidr }}"
+        tags: "{{ resource_tags | default(omit) }}"
+        state: present
+      register: r_vnet
+      retries: 10
+      delay: 30
+      until: r_vnet.state.id is defined
+
+    - name: Create the Control Plane Subnet
+      azure.azcollection.azure_rm_subnet:
+        name: "{{ cluster_vnet_control_plane_subnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        virtual_network_name: "{{ cluster_vnet_name }}"
+        address_prefix: "{{ cluster_vnet_control_plane_cidr }}"
+        service_endpoints:
+          - service: Microsoft.ContainerRegistry
+        private_link_service_network_policies: "{{ private_link_service_network_policies | default('Disabled') }}"
+      register: r_control_plane_subnet
+
+    - name: Create the Application Node Subnet
+      azure.azcollection.azure_rm_subnet:
+        name: "{{ cluster_vnet_app_node_subnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        virtual_network_name: "{{ cluster_vnet_name }}"
+        address_prefix: "{{ cluster_vnet_app_node_cidr }}"
+        service_endpoints:
+          - service: Microsoft.ContainerRegistry
+        private_link_service_network_policies: "{{ private_link_service_network_policies | default('Disabled') }}"
+      register: r_application_node_subnet
+
+    - name: Create the Azure Red Hat OpenShift Cluster
+      azure.azcollection.azure_rm_openshiftmanagedcluster:
+        name: "{{ cluster_name }}"
+        resource_group: "{{ cluster_resource_group }}"
+        location: "{{ azure_location }}"
+        tags: "{{ resource_tags | default(omit) }}"
+        api_server_profile:
+          visibility: "{{ api_server_visibility | default('Public') }}"
+        ingress_profiles:
+          - visibility: "{{ ingress_visibility | default('Public') }}"
+        cluster_profile:
+          domain: "{{ cluster_name }}.{{ cluster_domain }}"
+          pull_secret: "{{ cluster_pull_secret | to_json }}"
+        master_profile:
+          subnet_id: "{{ r_control_plane_subnet.state.id }}"
+          vm_size: "{{ control_plane_vm_size | default('Standard_D8s_v3') }}"
+        worker_profiles:
+          - count: 3
+            disk_size: 128
+            subnet_id: "{{ r_application_node_subnet.state.id }}"
+            vm_size: "{{ compute_vm_size | default('Standard_D4s_v3') }}"
+            name: worker
+        service_principal_profile:
+          client_id: '{{ lookup("env", "AZURE_CLIENT_ID") }}'
+          client_secret: '{{ lookup("env", "AZURE_SECRET") }}'
