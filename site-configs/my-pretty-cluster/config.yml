@@ -1,5 +1,5 @@
 ---
-azure_location: centralus
+azure_location: eastus
 cluster_name: my-pretty-cluster
 cluster_domain: 2jqgq.azure.redhatworkshops.io
 
