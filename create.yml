@@ -2,7 +2,8 @@
 - name: Create Azure Red Hat OpenShift Cluster
   hosts: all
   gather_facts: false
-
+  vars:
+    use_site_configs: true
 
   tasks:
 
