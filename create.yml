@@ -20,7 +20,8 @@
         - always
 
     - name: Get the account details to perform a connectivity and authentication test
-      azure.azcollection.azure_rm_account_info:
+      azure.azcollection.azure_rm_subscription_info:
+        all: True
       register: r_account_info
 
     - name: Run the terraform bootstrapper to enable Resource Providers

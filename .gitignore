@@ -1,4 +1,6 @@
 ansible-navigator.log
+artifacts/
+artifacts/**
 context/
 context/**
 .vscode/
