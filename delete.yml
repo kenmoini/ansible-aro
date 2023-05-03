@@ -1,0 +1,70 @@
+
+- name: Delete Azure Red Hat OpenShift Cluster
+  hosts: all
+  gather_facts: false
+  vars:
+    use_site_configs: true
+    site_config_name: "my-pretty-cluster"
+
+  tasks:
+
+    - name: SITECONFIG - Read in site configs
+      when:
+        - use_site_configs | bool
+        - site_config_name is defined
+      ansible.builtin.include_vars:
+        dir: "site-configs/{{ site_config_name }}"
+        extensions:
+          - 'yaml'
+          - 'yml'
+      tags:
+        - always
+
+    - name: Preflight - Get the account details to perform a connectivity and authentication test
+      azure.azcollection.azure_rm_subscription_info:
+        all: true
+      register: r_account_info
+
+    - name: Delete Azure Red Hat OpenShift Managed Cluster
+      azure.azcollection.azure_rm_openshiftmanagedcluster:
+        name: "{{ cluster_name }}"
+        resource_group: "{{ cluster_resource_group }}"
+        location: "{{ azure_location }}"
+        state: absent
+      register: r_cluster_delete
+
+    - name: Delete the Application Node Subnet
+      azure.azcollection.azure_rm_subnet:
+        name: "{{ cluster_vnet_app_node_subnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        virtual_network_name: "{{ cluster_vnet_name }}"
+        state: absent
+      register: r_subnet_app_delete
+
+    - name: Delete the Control Plane Subnet
+      azure.azcollection.azure_rm_subnet:
+        name: "{{ cluster_vnet_control_plane_subnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        virtual_network_name: "{{ cluster_vnet_name }}"
+        state: absent
+      register: r_subnet_control_delete
+
+    - name: Delete the Virtual Network
+      azure.azcollection.azure_rm_virtualnetwork:
+        name: "{{ cluster_vnet_name }}"
+        resource_group: "{{ cluster_vnet_resource_group }}"
+        state: absent
+      register: r_vnet_delete
+      failed_when: "'could not be found' not in r_vnet_delete.msg"
+
+    - name: Delete the ARO VNet ResourceGroup
+      when: create_vnet_resource_group | bool
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ cluster_vnet_resource_group }}"
+        location: "{{ azure_location }}"
+        state: absent
+
+    - name: Delete the Resource Group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ cluster_resource_group }}"
+        state: absent

@@ -1,3 +1,34 @@
 ---
-location: eastus
+azure_location: centralus
 cluster_name: my-pretty-cluster
+cluster_domain: 2jqgq.azure.redhatworkshops.io
+
+cluster_resource_group: "{{ cluster_name }}-rg"
+
+create_vnet_resource_group: true
+cluster_vnet_resource_group: "{{ cluster_name }}-vnet-rg"
+
+cluster_vnet_name: "{{ cluster_name }}-vnet"
+cluster_vnet_cidr: "10.42.0.0/16"
+cluster_vnet_control_plane_cidr: "10.42.0.0/23"
+cluster_vnet_app_node_cidr: "10.42.2.0/23"
+
+cluster_vnet_control_plane_subnet_name: "{{ cluster_name }}-cp"
+cluster_vnet_app_node_subnet_name: "{{ cluster_name }}-app"
+
+private_link_service_network_policies: Disabled
+
+create_infrastructure_resource_group: true
+cluster_infrastructure_resource_group: "{{ cluster_name }}-infra-rg"
+
+control_plane_vm_group: standardDSv3Family
+control_plane_vm_size: Standard_D8s_v3 # options: Standard_D8s_v3 | Standard_D16s_v3 | Standard_D32s_v3
+
+compute_vm_group: standardDSv4Family
+compute_vm_size: Standard_D8s_v3
+
+resource_tags:
+  workloadDesignation: aro
+  environment: notProd
+
+cluster_pull_secret: "{{ lookup('file', '~/rh-pull-secret.json') }}"

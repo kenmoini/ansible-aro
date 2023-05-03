@@ -23,4 +23,5 @@ additional_build_steps:
     RUN dnf update -y && dnf clean all && ansible --version
   append:
     - RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar -xvzf - -C /usr/local/bin/ oc kubectl && chmod 755 /usr/local/bin/oc && chmod 755 /usr/local/bin/kubectl && curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-    - RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && dnf install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm && dnf install azure-cli -y
+    - RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && dnf install -y https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm && dnf install azure-cli -y && az --help && az config set extension.use_dynamic_install=yes_without_prompt
+    - RUN dnf install -y dnf-plugins-core && dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && dnf -y install terraform && terraform --help
